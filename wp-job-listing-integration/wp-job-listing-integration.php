@@ -25,8 +25,24 @@ function wpjli_enqueue_admin_styles()
 {
   wp_enqueue_style('wpjli-admin-style', plugin_dir_url(__FILE__) . 'assets/css/admin-style.css');
 }
+function getLatestFolder($directory)
+{
+  $folders = array_filter(glob($directory . '/*'), 'is_dir');
+  $latest_folder = '';
 
+  $latest_time = 0;
+  foreach ($folders as $folder) {
+    $time = filemtime($folder);
+    if ($time > $latest_time) {
+      $latest_time = $time;
+      $latest_folder = $folder;
+    }
+  }
+
+  return basename($latest_folder);
+}
 // Weitere Funktionen und Handler können hier hinzugefügt werden...
+
 function wpjli_upload_form_shortcode()
 {
   // Überprüfen, ob der Benutzer eingeloggt ist
@@ -59,51 +75,38 @@ function wpjli_upload_form_shortcode()
         $zip->extractTo($extractPath);
         $zip->close();
 
-        // Diagnosecode: Überprüfen Sie den Inhalt des entpackten Verzeichnisses
-        $files = scandir($extractPath);
-        $extracted_folder = null;
+        // Bestimmen Sie den neuesten Ordner im HTMLupload Verzeichnis
+        $extracted_folder = getLatestFolder($extractPath);
 
-        // Finden Sie den richtigen Unterordner (ignorieren Sie "._" Dateien und andere Systemdateien)
-        foreach ($files as $file) {
-          if ($file !== '.' && $file !== '..' && !preg_match('/^._/', $file)) {
-            $extracted_folder = $file;
-            break;
-          }
-        }
+        // Überprüfen Sie, ob die erforderlichen Dateien vorhanden sind
+        if (file_exists($extractPath . '/' . $extracted_folder . '/index.html') && file_exists($extractPath . '/' . $extracted_folder . '/style.css')) {
 
-        if ($extracted_folder) {
-          // Überprüfen Sie, ob die erforderlichen Dateien vorhanden sind
-          if (file_exists($extractPath . '/' . $extracted_folder . '/index.html') && file_exists($extractPath . '/' . $extracted_folder . '/style.css')) {
+          // Lese den Inhalt von index.html
+          $html_content = file_get_contents($extractPath . '/' . $extracted_folder . '/index.html');
 
-            // Lese den Inhalt von index.html
-            $html_content = file_get_contents($extractPath . '/' . $extracted_folder . '/index.html');
+          // Extrahiere den Titel aus index.html
+          preg_match('/<title>([^<]+)<\/title>/', $html_content, $matches);
+          $post_title = isset($matches[1]) ? $matches[1] : 'Neue Stellenanzeige'; // Verwenden Sie den extrahierten Titel oder einen Standardtitel
 
-            // Extrahiere den Titel aus index.html
-            preg_match('/<title>([^<]+)<\/title>/', $html_content, $matches);
-            $post_title = isset($matches[1]) ? $matches[1] : 'Neue Stellenanzeige'; // Verwenden Sie den extrahierten Titel oder einen Standardtitel
+          // Lese den Inhalt von style.css
+          $css_content = '<style>' . file_get_contents($extractPath . '/' . $extracted_folder . '/style.css') . '</style>';
 
-            // Lese den Inhalt von style.css
-            $css_content = '<style>' . file_get_contents($extractPath . '/' . $extracted_folder . '/style.css') . '</style>';
+          // Erstelle einen neuen WordPress-Beitrag
+          $post_id = wp_insert_post(array(
+            'post_title'    => $post_title,
+            'post_content'  => $css_content . $html_content,
+            'post_status'   => 'publish',
+            'post_author'   => get_current_user_id(),
+            'post_type'     => 'job_listing'
+          ));
 
-            // Erstelle einen neuen WordPress-Beitrag
-            $post_id = wp_insert_post(array(
-              'post_title'    => $post_title,
-              'post_content'  => $css_content . $html_content,
-              'post_status'   => 'publish',
-              'post_author'   => get_current_user_id(),
-              'post_type'     => 'job_listing'
-            ));
-
-            if ($post_id) {
-              $output .= "Stellenanzeige erfolgreich erstellt!";
-            } else {
-              $output .= "Fehler beim Erstellen der Stellenanzeige.";
-            }
+          if ($post_id) {
+            $output .= "Stellenanzeige erfolgreich erstellt!";
           } else {
-            $output .= "Die erforderlichen Dateien fehlen im Archiv.";
+            $output .= "Fehler beim Erstellen der Stellenanzeige.";
           }
         } else {
-          $output .= "Es wurde kein gültiger Unterordner im Archiv gefunden.";
+          $output .= "Die erforderlichen Dateien fehlen im Archiv.";
         }
       } else {
         $output .= "Fehler beim Öffnen des .zip-Archivs.";
