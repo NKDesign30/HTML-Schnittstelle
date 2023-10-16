@@ -41,7 +41,7 @@ function wpjli_upload_form_shortcode()
 
     $uploadedFile = $_FILES['jobListing'];
 
-    // Überprüfen Sie die Dateierweiterung anstelle des MIME-Typs
+    // Überprüfen Sie die Dateierweiterung
     $file_extension = pathinfo($uploadedFile['name'], PATHINFO_EXTENSION);
     if (strtolower($file_extension) == 'zip') {
 
@@ -55,26 +55,55 @@ function wpjli_upload_form_shortcode()
         // Fügen Sie den Unterordner 'HTMLupload' hinzu
         $extractPath = $base_upload_path . '/HTMLupload';
 
-        // Stellen Sie sicher, dass das Verzeichnis existiert (wenn nicht, erstellen Sie es)
-        if (!file_exists($extractPath)) {
-          mkdir($extractPath, 0755, true);
-        }
-
         // Entpacken Sie das Archiv in das festgelegte Verzeichnis
         $zip->extractTo($extractPath);
         $zip->close();
 
         // Diagnosecode: Überprüfen Sie den Inhalt des entpackten Verzeichnisses
         $files = scandir($extractPath);
-        var_dump($files); // Dies wird den Inhalt des Verzeichnisses ausgeben
+        $extracted_folder = null;
 
+        // Finden Sie den richtigen Unterordner (ignorieren Sie "._" Dateien und andere Systemdateien)
+        foreach ($files as $file) {
+          if ($file !== '.' && $file !== '..' && !preg_match('/^._/', $file)) {
+            $extracted_folder = $file;
+            break;
+          }
+        }
 
-        // Überprüfen Sie, ob die erforderlichen Dateien vorhanden sind
-        if (file_exists($extractPath . '/index.html') && file_exists($extractPath . '/style.css')) {
-          // Hier können Sie den Inhalt von index.html und style.css verarbeiten und in einen WordPress-Beitrag konvertieren
-          $output .= "Dateien erfolgreich hochgeladen und verarbeitet!";
+        if ($extracted_folder) {
+          // Überprüfen Sie, ob die erforderlichen Dateien vorhanden sind
+          if (file_exists($extractPath . '/' . $extracted_folder . '/index.html') && file_exists($extractPath . '/' . $extracted_folder . '/style.css')) {
+
+            // Lese den Inhalt von index.html
+            $html_content = file_get_contents($extractPath . '/' . $extracted_folder . '/index.html');
+
+            // Extrahiere den Titel aus index.html
+            preg_match('/<title>([^<]+)<\/title>/', $html_content, $matches);
+            $post_title = isset($matches[1]) ? $matches[1] : 'Neue Stellenanzeige'; // Verwenden Sie den extrahierten Titel oder einen Standardtitel
+
+            // Lese den Inhalt von style.css
+            $css_content = '<style>' . file_get_contents($extractPath . '/' . $extracted_folder . '/style.css') . '</style>';
+
+            // Erstelle einen neuen WordPress-Beitrag
+            $post_id = wp_insert_post(array(
+              'post_title'    => $post_title,
+              'post_content'  => $css_content . $html_content,
+              'post_status'   => 'publish',
+              'post_author'   => get_current_user_id(),
+              'post_type'     => 'job_listing'
+            ));
+
+            if ($post_id) {
+              $output .= "Stellenanzeige erfolgreich erstellt!";
+            } else {
+              $output .= "Fehler beim Erstellen der Stellenanzeige.";
+            }
+          } else {
+            $output .= "Die erforderlichen Dateien fehlen im Archiv.";
+          }
         } else {
-          $output .= "Die erforderlichen Dateien fehlen im Archiv.";
+          $output .= "Es wurde kein gültiger Unterordner im Archiv gefunden.";
         }
       } else {
         $output .= "Fehler beim Öffnen des .zip-Archivs.";
