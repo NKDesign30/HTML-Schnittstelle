@@ -38,10 +38,13 @@ function wpjli_upload_form_shortcode()
 
   // Wenn das Formular abgesendet wurde
   if (isset($_POST['submit']) && isset($_FILES['jobListing']) && wp_verify_nonce($_POST['_wpnonce'], 'wpjli_upload_nonce')) {
+
     $uploadedFile = $_FILES['jobListing'];
 
-    // Überprüfen, ob es sich um eine .zip-Datei handelt
-    if ($uploadedFile['type'] == 'application/zip') {
+    // Überprüfen Sie die Dateierweiterung anstelle des MIME-Typs
+    $file_extension = pathinfo($uploadedFile['name'], PATHINFO_EXTENSION);
+    if (strtolower($file_extension) == 'zip') {
+
       $zip = new ZipArchive;
       $res = $zip->open($uploadedFile['tmp_name']);
       if ($res === TRUE) {
