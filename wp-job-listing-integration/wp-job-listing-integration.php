@@ -61,6 +61,11 @@ function wpjli_upload_form_shortcode()
         $zip->extractTo($extractPath);
         $zip->close();
 
+        // Diagnosecode: Überprüfen Sie den Inhalt des entpackten Verzeichnisses
+        $files = scandir($extractPath);
+        var_dump($files); // Dies wird den Inhalt des Verzeichnisses ausgeben
+
+
         // Überprüfen Sie, ob die erforderlichen Dateien vorhanden sind
         if (file_exists($extractPath . '/index.html') && file_exists($extractPath . '/style.css')) {
           // Hier können Sie den Inhalt von index.html und style.css verarbeiten und in einen WordPress-Beitrag konvertieren
