@@ -45,7 +45,7 @@ if (isset($_POST['submit']) && isset($_FILES['jobListing']) && wp_verify_nonce($
 <h2>Stellenanzeige hochladen</h2>
 <form action="" method="post" enctype="multipart/form-data">
   <?php wp_nonce_field('wpjli_upload_nonce'); ?>
-  Wählen Sie die Dateien zum Hochladen aus:
+ 2 Wählen Sie die Dateien zum Hochladen aus:
   <label for="jobListing">Wählen Sie die .zip-Datei zum Hochladen aus:</label>
   <input type="file" name="jobListing" id="jobListing" accept=".zip">
   <input type="submit" name="submit" value="Hochladen">
